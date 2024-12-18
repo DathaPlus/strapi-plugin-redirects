@@ -6,6 +6,7 @@ const typeMappings = {
   '301': 'moved_permanently_301',
   '302': 'found_302',
   '307': 'temporary_redirect_307',
+  '308': 'permanent_redirect_308',
   '410': 'gone_410',
   '451': 'unavailable_for_legal_reasons_451',
 };

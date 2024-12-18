@@ -44,6 +44,8 @@ const RedirectOverviewPage = () => {
   const [redirects, setRedirects] = useState([]);
   const [totalNumberOfRedirects, setTotalNumberOfRedirects] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [redirectToDelete, setRedirectToDelete] = useState(null);
   const debouncedSearchValue = useDebounce(searchValue, 300);
   const prevDebouncedSearchValue = usePrevious(debouncedSearchValue);
   const tableHeaders = [
@@ -126,14 +128,29 @@ const RedirectOverviewPage = () => {
     setSearchValue(e.target.value);
   };
 
-  const handleDeleteRedirect = async (id) => {
+  const handleOpenDeleteModal = (id) => {
+    setRedirectToDelete(id);
+    setIsDeleteModalOpen(true);
+  }
+
+  const handleCloseDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setRedirectToDelete(null);
+  }
+
+  const handleConfirmDelete  = async () => {
+    if(!redirectToDelete) return;
+
     try {
-      await del(`/${pluginId}/${id}`);
+      await del(`/${pluginId}/${redirectToDelete}`);
       await getRedirects(1);
     } catch (error) {
       setRedirects([]);
       setTotalNumberOfRedirects(0);
       setIsLoading(false);
+    } finally {
+      setIsDeleteModalOpen(false);
+      setRedirectToDelete(null);
     }
   };
 
@@ -150,6 +167,51 @@ const RedirectOverviewPage = () => {
 
   return (
     <Box>
+
+      {isDeleteModalOpen && (
+          <Flex
+              position={"fixed"}
+              top={"0"}
+              left={"0"}
+              width={"100%"}
+              height={"100%"}
+              background={"rgba(0,0,0,0.5)"}
+              alignItems={"center"}
+              justifyContent={"center"}
+              zIndex={1000}
+              onClick={handleCloseDeleteModal}
+          >
+            <Box background={"rgb(33, 33, 52)"} padding={6} borderRadius={"4px"} shadow={"tableShadow"} onClick={(e) => e.stopPropagation()}>
+              <Typography variant={"beta"} style={{ color: "white" }}  as="h4" marginBottom={4}>
+                {formatMessage({ id: getTrad('overview.delete.confirmation.title') })}
+              </Typography>
+              <Typography  style={{ color: "white" }} marginBottom={6}>
+                {formatMessage({ id: getTrad('overview.delete.confirmation.description') })}
+              </Typography>
+              <Flex justifyContent="flex-end" padding={3} gin gap={4}>
+                <Button variant="secondary" onClick={handleCloseDeleteModal} style={{
+                  background: "transparent",
+                  color: "white",
+                  border: "1px solid white",
+                }}
+                        onMouseEnter={(e) => (e.target.style.background = "rgba(255, 255, 255, 0.2)")}
+                        onMouseLeave={(e) => (e.target.style.background = "transparent")}>
+                  {formatMessage({ id: getTrad('overview.delete.confirmation.cancel') })}
+                </Button>
+                <Button variant="danger" onClick={handleConfirmDelete} style={{
+                  background: "rgba(255, 0, 0, 0.8)",
+                  color: "white",
+                  border: "none",
+                }}
+                        onMouseEnter={(e) => (e.target.style.background = "rgba(255, 0, 0, 1)")}
+                        onMouseLeave={(e) => (e.target.style.background = "rgba(255, 0, 0, 0.8)")}>
+                  {formatMessage({ id: getTrad('overview.delete.confirmation.confirm') })}
+                </Button>
+              </Flex>
+            </Box>
+          </Flex>
+      )}
+
       <BaseHeaderLayout
         p={0}
         primaryAction={
@@ -196,7 +258,7 @@ const RedirectOverviewPage = () => {
           <Icon width={3} height={3} as={isOpen ? ChevronUp : ChevronDown} />
         </S.SelectHelp>
         {isOpen && (
-          <S.InfoBox hasRadius padding={4} marginTop={4} background="#fff">
+          <S.InfoBox hasRadius padding={4} marginTop={4} >
             <S.InfoItem>
               <Typography textColor="neutral800" fontWeight="bold" as="h4" marginBottom={2}>
                 {formatMessage({ id: getTrad('overview.help.instructions') })}
@@ -277,7 +339,7 @@ const RedirectOverviewPage = () => {
                         icon={<Pencil />}
                       />
                       <IconButton
-                        onClick={() => handleDeleteRedirect(entry.id)}
+                        onClick={() => handleOpenDeleteModal(entry.id)}
                         label={formatMessage({ id: getTrad('overview.table.actions.delete.label') })}
                         noBorder
                         icon={<Trash />}
