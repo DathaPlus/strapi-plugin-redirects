@@ -145,16 +145,26 @@ export { RedirectForm };
 const FormSchema = (formatMessage) => {
   const relativeUrlRegEx = /^(?!www\.|(?:https?|ftp):\/\/|[A-Za-z]:\\|\/\/).+$/;
   const absoluteUrlRegex = /^(www\.|(?:https?|ftp):\/\/|[A-Za-z]:\\|\/\/).+$/;
+  const noAccentsRegex = /^[^\u00C0-\u017F]+$/;
+
   const fm = (id, values) => formatMessage({ id: getTrad(id) }, values);
 
   return Yup.object().shape({
     from: Yup.string()
-      .matches(relativeUrlRegEx, fm('general.form.errors.relativeUrl'))
-      .required(fm('general.form.errors.required')),
+        .matches(noAccentsRegex, fm('general.form.errors.noAccents'))
+        .matches(relativeUrlRegEx, fm('general.form.errors.relativeUrl'))
+        .required(fm('general.form.errors.required')),
     to: Yup.string()
-      .test('relativeOrAbsoluteUrl', fm('general.form.errors.url'), (value) => !!value && (relativeUrlRegEx.test(value) || absoluteUrlRegex.test(value)))
-      .required(fm('general.form.errors.required'))
-      .when(['from'], (from, schema) => schema.notOneOf([from], fm('general.form.errors.duplicate', { field: 'from' }))),
+        .matches(noAccentsRegex, fm('general.form.errors.noAccents'))
+        .test('no-loop-with-language-prefix', fm('general.form.errors.loopPath'),function (value) {
+              const { from } = this.parent;
+              if (!from || !value) return true;
+              const prefixedRegex = new RegExp(`^\/[a-z]{2}-[a-z]{2}${from}$`);
+              return !prefixedRegex.test(value);
+            })
+        .test('relativeOrAbsoluteUrl', fm('general.form.errors.url'), (value) => !!value && (relativeUrlRegEx.test(value) || absoluteUrlRegex.test(value)))
+        .required(fm('general.form.errors.required'))
+        .when(['from'], (from, schema) => schema.notOneOf([from], fm('general.form.errors.duplicate', { field: 'from' }))),
     type: Yup.string()
       .required(fm('general.form.errors.required'))
       .oneOf(redirectTypeOptions, fm('general.form.errors.oneOf'))
