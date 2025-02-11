@@ -1,6 +1,6 @@
 {
-  "name": "strapi-plugin-redirects-dathaplus",
-  "version": "1.0.3010",
+  "name": "@dathaplus/strapi-plugin-redirects",
+  "version": "1.0.3011",
   "description": "This plugin allows a user to manage redirects from the admin panel.",
   "strapi": {
     "name": "redirects",
