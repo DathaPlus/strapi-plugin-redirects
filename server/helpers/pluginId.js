@@ -8,9 +8,11 @@ const pluginPkg = require('../../package.json');
  * @return {string} The plugin ID. 
  */
 
-const pluginId = pluginPkg.name.replace(
-  /^(@[^-,.][\w,-]+\/|strapi-)plugin-/i,
-  ""
-);
+// const pluginId = pluginPkg.name.replace(
+//   /^(@[^-,.][\w,-]+\/|strapi-)plugin-/i,
+//   ""
+// );
+
+const pluginId = 'redirects';
 
 module.exports = pluginId;
