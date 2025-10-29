@@ -1,7 +1,11 @@
 const { errors } = require('@strapi/utils');
 const { ApplicationError } = errors;
 const { validateRedirect } = require('../helpers/redirectValidationHelper');
-const NOLIMIT = -1;
+const http = require('http');
+const https = require('https');
+const { URL } = require('url');
+
+console.log('=== redirects.js SERVICE LOADED ===');
 
 module.exports = ({ strapi }) => ({
   /**
@@ -79,7 +83,7 @@ module.exports = ({ strapi }) => ({
    * @returns 
    */
   update: async (id, { body }) => {
-    const validity = await validateRedirect(body, isUpdate = true);
+    const validity = await validateRedirect({ ...body, id }, true);
 
     if (!validity.ok) {
       throw new ApplicationError(validity.errorMessage, validity.details);
@@ -151,5 +155,171 @@ module.exports = ({ strapi }) => ({
     }
   
     return importResults;
+  }
+  ,
+  /**
+   * Save or retrieve webhook configuration
+   * For GET without query params: returns current config
+   * For GET with ?url=...&headers=JSON: saves config
+   */
+  saveWebhook: async (query) => {
+    console.log('=== saveWebhook called with query:', JSON.stringify(query, null, 2));
+    
+    const hasParams = query && (typeof query.url === 'string' || typeof query.headers === 'string');
+    console.log('=== hasParams:', hasParams);
+    
+    if (!hasParams) {
+      // Try to get from strapi.store first
+      try {
+        const store = strapi.store({ type: 'plugin', name: 'redirects' });
+        const current = await store.get({ key: 'webhookConfig' });
+        console.log('=== Retrieved from store:', JSON.stringify(current, null, 2));
+        return current || { url: '', headers: [] };
+      } catch (e) {
+        console.log('=== Store error, returning empty config:', e.message);
+        return { url: '', headers: [] };
+      }
+    }
+
+    const url = decodeURIComponent(query.url || '').trim();
+    
+    // Validate URL is not empty
+    if (!url) {
+      throw new ApplicationError('Webhook URL is required', {
+        status: 400,
+        details: { type: 'INVALID_WEBHOOK_URL' }
+      });
+    }
+
+    let headers = [];
+    try {
+      headers = query.headers ? JSON.parse(decodeURIComponent(query.headers)) : [];
+    } catch (e) {
+      throw new ApplicationError('Invalid headers format');
+    }
+
+    const config = { url, headers };
+    
+    // Debug logging
+    console.log('=== Saving webhook config:', JSON.stringify(config, null, 2));
+    
+    try {
+      const store = strapi.store({ type: 'plugin', name: 'redirects' });
+      await store.set({ key: 'webhookConfig', value: config });
+      
+      // Verify it was saved
+      const saved = await store.get({ key: 'webhookConfig' });
+      console.log('=== Webhook config after save:', JSON.stringify(saved, null, 2));
+      
+      return { ok: true };
+    } catch (e) {
+      console.log('=== Store save error:', e.message);
+      throw new ApplicationError('Failed to save webhook configuration', {
+        status: 500,
+        details: { type: 'STORE_SAVE_ERROR', originalError: e.message }
+      });
+    }
+  }
+  ,
+  /**
+   * Execute configured webhook
+   */
+  executeWebhook: async () => {
+    const store = strapi.store({ type: 'plugin', name: 'redirects' });
+    const config = (await store.get({ key: 'webhookConfig' })) || {};
+    
+    // Debug logging
+    console.log('Webhook config retrieved:', JSON.stringify(config, null, 2));
+    
+    const url = config.url ? config.url.trim() : '';
+    const headersList = Array.isArray(config.headers) ? config.headers : [];
+
+    if (!url) {
+      console.log('Webhook URL is empty or not configured');
+      throw new ApplicationError('Webhook URL not configured', { 
+        status: 400,
+        details: { type: 'WEBHOOK_NOT_CONFIGURED' }
+      });
+    }
+
+    const headersObj = headersList.reduce((acc, cur) => {
+      if (cur && cur.key && cur.key.trim()) {
+        acc[cur.key.trim()] = cur.value || '';
+      }
+      return acc;
+    }, {});
+
+    const doFetch = async () => {
+      // Use global fetch (Node 18+)
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30s
+
+      try {
+        // If calling GitHub Actions workflow_dispatch/dispatches, send default body
+        let bodyPayload = undefined;
+        const contentType = (headersObj['Content-Type'] || headersObj['content-type'] || '').toLowerCase();
+        const isGithubDispatch = url.includes('api.github.com') && url.includes('/dispatches');
+        if (isGithubDispatch) {
+          // Default payload for workflow_dispatch
+          bodyPayload = { ref: 'master', inputs: { environment: 'deploy_prod' } };
+          // Ensure JSON header is present
+          if (!contentType.includes('application/json')) {
+            headersObj['Content-Type'] = 'application/json';
+          }
+        }
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: headersObj,
+          body: bodyPayload ? JSON.stringify(bodyPayload) : undefined,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+        const responseHeaders = Object.fromEntries(response.headers.entries());
+        // If GitHub returns non-2xx (e.g., 422), surface the error body for debugging
+        if (response.status < 200 || response.status >= 300) {
+          const errorText = await response.text();
+          console.log('Webhook non-2xx response:', response.status, errorText);
+          throw new ApplicationError('Webhook returned non-2xx status', {
+            status: response.status,
+            details: { type: 'WEBHOOK_NON_2XX', body: errorText }
+          });
+        }
+
+        return {
+          status: response.status,
+          statusText: response.statusText,
+          headers: responseHeaders,
+        };
+      } catch (error) {
+        clearTimeout(timeout);
+        if (error && error.name === 'AbortError') {
+          throw new ApplicationError('Webhook request timeout', {
+            status: 408,
+            details: { type: 'WEBHOOK_TIMEOUT' }
+          });
+        }
+        throw new ApplicationError(`Webhook request failed: ${error.message}`, {
+          status: 500,
+          details: { type: 'WEBHOOK_REQUEST_FAILED', originalError: error.message }
+        });
+      }
+    };
+
+    try {
+      const result = await doFetch();
+      return { ok: true, result };
+    } catch (error) {
+      // If it's already an ApplicationError, re-throw it
+      if (error instanceof ApplicationError) {
+        throw error;
+      }
+      // Otherwise, wrap it
+      throw new ApplicationError(`Failed to execute webhook: ${error.message}`, {
+        status: 500,
+        details: { type: 'WEBHOOK_EXECUTION_FAILED', originalError: error.message }
+      });
+    }
   }
 });
