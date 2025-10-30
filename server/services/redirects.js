@@ -5,8 +5,6 @@ const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 
-console.log('=== redirects.js SERVICE LOADED ===');
-
 module.exports = ({ strapi }) => ({
   /**
    * Find a single redirect
@@ -163,20 +161,15 @@ module.exports = ({ strapi }) => ({
    * For GET with ?url=...&headers=JSON: saves config
    */
   saveWebhook: async (query) => {
-    console.log('=== saveWebhook called with query:', JSON.stringify(query, null, 2));
-    
     const hasParams = query && (typeof query.url === 'string' || typeof query.headers === 'string');
-    console.log('=== hasParams:', hasParams);
     
     if (!hasParams) {
       // Try to get from strapi.store first
       try {
         const store = strapi.store({ type: 'plugin', name: 'redirects' });
         const current = await store.get({ key: 'webhookConfig' });
-        console.log('=== Retrieved from store:', JSON.stringify(current, null, 2));
         return current || { url: '', headers: [] };
       } catch (e) {
-        console.log('=== Store error, returning empty config:', e.message);
         return { url: '', headers: [] };
       }
     }
@@ -200,20 +193,15 @@ module.exports = ({ strapi }) => ({
 
     const config = { url, headers };
     
-    // Debug logging
-    console.log('=== Saving webhook config:', JSON.stringify(config, null, 2));
-    
     try {
       const store = strapi.store({ type: 'plugin', name: 'redirects' });
       await store.set({ key: 'webhookConfig', value: config });
       
       // Verify it was saved
       const saved = await store.get({ key: 'webhookConfig' });
-      console.log('=== Webhook config after save:', JSON.stringify(saved, null, 2));
       
       return { ok: true };
     } catch (e) {
-      console.log('=== Store save error:', e.message);
       throw new ApplicationError('Failed to save webhook configuration', {
         status: 500,
         details: { type: 'STORE_SAVE_ERROR', originalError: e.message }
@@ -228,14 +216,10 @@ module.exports = ({ strapi }) => ({
     const store = strapi.store({ type: 'plugin', name: 'redirects' });
     const config = (await store.get({ key: 'webhookConfig' })) || {};
     
-    // Debug logging
-    console.log('Webhook config retrieved:', JSON.stringify(config, null, 2));
-    
     const url = config.url ? config.url.trim() : '';
     const headersList = Array.isArray(config.headers) ? config.headers : [];
 
     if (!url) {
-      console.log('Webhook URL is empty or not configured');
       throw new ApplicationError('Webhook URL not configured', { 
         status: 400,
         details: { type: 'WEBHOOK_NOT_CONFIGURED' }
@@ -277,10 +261,8 @@ module.exports = ({ strapi }) => ({
 
         clearTimeout(timeout);
         const responseHeaders = Object.fromEntries(response.headers.entries());
-        // If GitHub returns non-2xx (e.g., 422), surface the error body for debugging
         if (response.status < 200 || response.status >= 300) {
           const errorText = await response.text();
-          console.log('Webhook non-2xx response:', response.status, errorText);
           throw new ApplicationError('Webhook returned non-2xx status', {
             status: response.status,
             details: { type: 'WEBHOOK_NON_2XX', body: errorText }
