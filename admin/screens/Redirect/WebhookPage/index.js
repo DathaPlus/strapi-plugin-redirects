@@ -30,15 +30,11 @@ const WebhookPage = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   const loadConfig = async () => {
-    try {
-      const { data } = await get(`/${pluginId}/webhook`);
-      if (data && data.url) {
+    const { data } = await get(`/${pluginId}/webhook`);
+    if (data && data.url) {
         setUrl(data.url || '');
         const loadedHeaders = Array.isArray(data.headers) ? data.headers : [];
         setHeaders(loadedHeaders.length > 0 ? loadedHeaders : [{ key: '', value: '' }]);
-      }
-    } catch (e) {
-      // ignore if not set yet
     }
   };
 
@@ -74,9 +70,10 @@ const WebhookPage = () => {
       }
       
       const compactHeaders = headers.filter(h => h.key || h.value);
-      const headersJson = encodeURIComponent(JSON.stringify(compactHeaders));
-      const urlParam = encodeURIComponent(url.trim());
-      const response = await get(`/${pluginId}/webhook?url=${urlParam}&headers=${headersJson}`);
+      const response = await post(`/${pluginId}/webhook`, {
+          url: url.trim(),
+          headers: compactHeaders,
+      });
       
       // Check if the request was successful (2xx status code, including 204 No Content)
       const isSuccess = response.status >= 200 && response.status < 300;
@@ -114,7 +111,7 @@ const WebhookPage = () => {
             {formatMessage({ id: 'redirects.webhook.back', defaultMessage: 'Back' })}
           </Link>
         }
-        title={formatMessage({ id: 'redirects.webhook.title', defaultMessage: 'Redirects' })}
+        title={formatMessage({ id: 'redirects.webhook.title', defaultMessage: 'Webhook redirect configuration' })}
         primaryAction={<Button onClick={handleSave} loading={isSaving}>{formatMessage({ id: 'redirects.webhook.save', defaultMessage: 'Save' })}</Button>}
         as="h2"
       />
@@ -167,7 +164,7 @@ const WebhookPage = () => {
             ))}
             <GridItem col={12} s={12}>
               <Link onClick={addHeaderRow} startIcon={<Plus />}>
-                {formatMessage({ id: 'redirects.webhook.header.add', defaultMessage: '+ Create new header' })}
+                {formatMessage({ id: 'redirects.webhook.header.add', defaultMessage: 'Create new header' })}
               </Link>
             </GridItem>
           </Grid>
