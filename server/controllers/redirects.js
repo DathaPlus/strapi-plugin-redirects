@@ -39,6 +39,25 @@ module.exports = () => ({
       };
     }
   },
+  /**
+   * Obtiene la configuración guardada del webhook (GET)
+   */
+  getWebhookConfig: async (ctx) => {
+    try {
+      const result = await getPluginService('redirects').getWebhookConfig();
+
+      ctx.status = 200;
+      ctx.body = result;
+    } catch (error) {
+      ctx.status = error.status || 400;
+      ctx.body = {
+        error: {
+          message: error.message || 'Error al obtener la configuración del webhook',
+          details: error.details || {},
+        },
+      };
+    }
+  },
   executeWebhook: async (ctx) => {
     try {
       ctx.body = await getPluginService('redirects').executeWebhook();

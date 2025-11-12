@@ -1,9 +1,49 @@
 const { errors } = require('@strapi/utils');
 const { ApplicationError } = errors;
 const { validateRedirect } = require('../helpers/redirectValidationHelper');
-const http = require('http');
-const https = require('https');
-const { URL } = require('url');
+
+const sendWebhookRequest = async (url, headers) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+  try {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    const responseHeaders = Object.fromEntries(response.headers.entries());
+    const status = response.status;
+    const statusText = response.statusText;
+
+    if (status < 200 || status >= 300) {
+        const errorText = await response.text();
+        throw new ApplicationError('Webhook returned non-2xx status', {
+          status,
+          details: { type: 'WEBHOOK_NON_2XX', body: errorText },
+        });
+    }
+
+    return { status, statusText, headers: responseHeaders };
+  } catch (error) {
+    clearTimeout(timeout);
+
+    if (error.name === 'AbortError') {
+        throw new ApplicationError('Webhook request timeout', {
+          status: 408,
+          details: { type: 'WEBHOOK_TIMEOUT' },
+        });
+    }
+
+    throw new ApplicationError(`Webhook request failed: ${error.message}`, {
+      status: 500,
+      details: { type: 'WEBHOOK_REQUEST_FAILED', originalError: error.message },
+    });
+  }
+};
 
 module.exports = ({ strapi }) => ({
   /**
@@ -155,60 +195,84 @@ module.exports = ({ strapi }) => ({
     return importResults;
   }
   ,
-  /**
-   * Save or retrieve webhook configuration
-   * For GET without query params: returns current config
-   * For GET with ?url=...&headers=JSON: saves config
-   */
-  saveWebhook: async (query) => {
-    const hasParams = query && (typeof query.url === 'string' || typeof query.headers === 'string');
-    
-    if (!hasParams) {
-      // Try to get from strapi.store first
-      try {
-        const store = strapi.store({ type: 'plugin', name: 'redirects' });
-        const current = await store.get({ key: 'webhookConfig' });
-        return current || { url: '', headers: [] };
-      } catch (e) {
-        return { url: '', headers: [] };
-      }
+    /**
+     * Save webhook configuration (POST)
+     */
+  saveWebhook: async (body) => {
+    const { url, headers } = body || {};
+
+    // ✅ Validar que se hayan enviado parámetros
+    if (!url && !headers) {
+      throw new ApplicationError(
+        "No se obtuvieron parámetros para realizar las configuraciones",
+        {
+          status: 400,
+          details: { type: "MISSING_PARAMETERS" },
+        }
+      );
     }
 
-    const url = decodeURIComponent(query.url || '').trim();
-    
-    // Validate URL is not empty
-    if (!url) {
-      throw new ApplicationError('Webhook URL is required', {
+    // ✅ Validar que la URL no esté vacía ni sea inválida
+    if (!url || typeof url !== "string" || !url.trim()) {
+      throw new ApplicationError("Webhook URL es requerida", {
         status: 400,
-        details: { type: 'INVALID_WEBHOOK_URL' }
+        details: { type: "INVALID_WEBHOOK_URL" },
       });
     }
 
-    let headers = [];
+    // ✅ Validar headers (si existen)
+    let parsedHeaders = [];
     try {
-      headers = query.headers ? JSON.parse(decodeURIComponent(query.headers)) : [];
+      if (headers) {
+        parsedHeaders = Array.isArray(headers)
+                  ? headers
+                  : JSON.parse(headers); // permite string JSON o array
+      }
     } catch (e) {
-      throw new ApplicationError('Invalid headers format');
+      throw new ApplicationError("Formato de headers inválido", {
+        status: 400,
+        details: { type: "INVALID_HEADERS_FORMAT" },
+      });
     }
 
-    const config = { url, headers };
-    
+    const config = { url: url.trim(), headers: parsedHeaders };
+
+    // ✅ Guardar configuración en el store
     try {
-      const store = strapi.store({ type: 'plugin', name: 'redirects' });
-      await store.set({ key: 'webhookConfig', value: config });
-      
-      // Verify it was saved
-      const saved = await store.get({ key: 'webhookConfig' });
-      
-      return { ok: true };
+      const store = strapi.store({ type: "plugin", name: "redirects" });
+      await store.set({ key: "webhookConfig", value: config });
+
+      return { ok: true, message: "Configuración del webhook guardada correctamente" };
     } catch (e) {
-      throw new ApplicationError('Failed to save webhook configuration', {
+      throw new ApplicationError("Error al guardar configuración del webhook", {
         status: 500,
-        details: { type: 'STORE_SAVE_ERROR', originalError: e.message }
+        details: { type: "STORE_SAVE_ERROR", originalError: e.message },
       });
     }
-  }
-  ,
+  },
+  /**
+   * Get webhook configuration (GET)
+   */
+  getWebhookConfig: async () => {
+    try {
+      const store = strapi.store({ type: "plugin", name: "redirects" });
+      const config = await store.get({ key: "webhookConfig" });
+
+      if (!config) {
+        throw new ApplicationError("No hay configuración guardada", {
+          status: 404,
+          details: { type: "CONFIG_NOT_FOUND" },
+        });
+      }
+
+      return config;
+    } catch (e) {
+      throw new ApplicationError("Error al obtener configuración del webhook", {
+        status: 500,
+        details: { type: "STORE_GET_ERROR", originalError: e.message },
+      });
+    }
+  },
   /**
    * Execute configured webhook
    */
@@ -233,74 +297,15 @@ module.exports = ({ strapi }) => ({
       return acc;
     }, {});
 
-    const doFetch = async () => {
-      // Use global fetch (Node 18+)
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000); // 30s
-
-      try {
-        // If calling GitHub Actions workflow_dispatch/dispatches, send default body
-        let bodyPayload = undefined;
-        const contentType = (headersObj['Content-Type'] || headersObj['content-type'] || '').toLowerCase();
-        const isGithubDispatch = url.includes('api.github.com') && url.includes('/dispatches');
-        if (isGithubDispatch) {
-          // Default payload for workflow_dispatch
-          bodyPayload = { ref: 'master', inputs: { environment: 'deploy_prod' } };
-          // Ensure JSON header is present
-          if (!contentType.includes('application/json')) {
-            headersObj['Content-Type'] = 'application/json';
-          }
-        }
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: headersObj,
-          body: bodyPayload ? JSON.stringify(bodyPayload) : undefined,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeout);
-        const responseHeaders = Object.fromEntries(response.headers.entries());
-        if (response.status < 200 || response.status >= 300) {
-          const errorText = await response.text();
-          throw new ApplicationError('Webhook returned non-2xx status', {
-            status: response.status,
-            details: { type: 'WEBHOOK_NON_2XX', body: errorText }
-          });
-        }
-
-        return {
-          status: response.status,
-          statusText: response.statusText,
-          headers: responseHeaders,
-        };
-      } catch (error) {
-        clearTimeout(timeout);
-        if (error && error.name === 'AbortError') {
-          throw new ApplicationError('Webhook request timeout', {
-            status: 408,
-            details: { type: 'WEBHOOK_TIMEOUT' }
-          });
-        }
-        throw new ApplicationError(`Webhook request failed: ${error.message}`, {
-          status: 500,
-          details: { type: 'WEBHOOK_REQUEST_FAILED', originalError: error.message }
-        });
-      }
-    };
-
     try {
-      const result = await doFetch();
+      const result = await sendWebhookRequest(url, headersObj);
       return { ok: true, result };
     } catch (error) {
-      // If it's already an ApplicationError, re-throw it
-      if (error instanceof ApplicationError) {
-        throw error;
-      }
-      // Otherwise, wrap it
+      if (error instanceof ApplicationError) throw error;
+
       throw new ApplicationError(`Failed to execute webhook: ${error.message}`, {
         status: 500,
-        details: { type: 'WEBHOOK_EXECUTION_FAILED', originalError: error.message }
+        details: { type: 'WEBHOOK_EXECUTION_FAILED', originalError: error.message },
       });
     }
   }

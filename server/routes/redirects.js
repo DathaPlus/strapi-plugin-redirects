@@ -3,10 +3,16 @@
 module.exports = [
   // Place specific webhook routes FIRST to avoid being shadowed by generic routes
   {
-    method: "GET",
+    method: "POST",
     path: "/webhook",
     handler: "redirects.saveWebhook",
     config: { policies: [], auth: false },
+  },
+  {
+    method: "GET",
+    path: "/webhook",
+    handler: "redirects.getWebhookConfig",
+    config: { auth: false },
   },
   {
     method: "GET",
@@ -50,17 +56,5 @@ module.exports = [
     path: "/import",
     handler: "redirects.import",
     config: { policies: [] },
-  },
-  {
-    method: "GET",
-    path: "/webhook",
-    handler: "redirects.saveWebhook",
-    config: { policies: [], auth: false },
-  },
-  {
-    method: "GET",
-    path: "/webhook/execute",
-    handler: "redirects.executeWebhook",
-    config: { policies: [], auth: false },
   },
 ];
