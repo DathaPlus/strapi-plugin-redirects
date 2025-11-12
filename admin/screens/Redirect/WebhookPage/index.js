@@ -21,7 +21,7 @@ import pluginId from '../../../helpers/pluginId';
 
 const WebhookPage = () => {
   const { formatMessage } = useIntl();
-  const { get } = useFetchClient();
+  const { get, post } = useFetchClient();
   const history = useHistory();
   const toggleNotification = useNotification();
 

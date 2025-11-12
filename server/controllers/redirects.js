@@ -24,8 +24,8 @@ module.exports = () => ({
   saveWebhook: async (ctx) => {
     try {
       // If there are no query params, return current config
-      const query = ctx.request.query || {};
-      const result = await getPluginService('redirects').saveWebhook(query);
+      const body = ctx.request.body || {};
+      const result = await getPluginService('redirects').saveWebhook(body);
       // Force 200 with JSON body to avoid 204 No Content in some proxies
       ctx.status = 200;
       ctx.body = result && Object.keys(result).length ? result : { ok: true };
