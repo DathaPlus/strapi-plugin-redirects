@@ -2,15 +2,16 @@ const { errors } = require('@strapi/utils');
 const { ApplicationError } = errors;
 const { validateRedirect } = require('../helpers/redirectValidationHelper');
 
-const sendWebhookRequest = async (url, headers) => {
+const sendWebhookRequest = async (url, headers, branch) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
   try {
     const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        signal: controller.signal,
+      method: 'POST',
+      headers,
+      body: branch ? JSON.stringify({ ref: branch }) : undefined,
+      signal: controller.signal,
     });
 
     clearTimeout(timeout);
@@ -20,11 +21,11 @@ const sendWebhookRequest = async (url, headers) => {
     const statusText = response.statusText;
 
     if (status < 200 || status >= 300) {
-        const errorText = await response.text();
-        throw new ApplicationError('Webhook returned non-2xx status', {
-          status,
-          details: { type: 'WEBHOOK_NON_2XX', body: errorText },
-        });
+      const errorText = await response.text();
+      throw new ApplicationError('Webhook returned non-2xx status', {
+        status,
+        details: { type: 'WEBHOOK_NON_2XX', body: errorText },
+      });
     }
 
     return { status, statusText, headers: responseHeaders };
@@ -199,7 +200,7 @@ module.exports = ({ strapi }) => ({
      * Save webhook configuration (POST)
      */
   saveWebhook: async (body) => {
-    const { url, headers } = body || {};
+    const { url, headers, branch } = body || {};
 
     // ✅ Validar que se hayan enviado parámetros
     if (!url && !headers) {
@@ -235,7 +236,7 @@ module.exports = ({ strapi }) => ({
       });
     }
 
-    const config = { url: url.trim(), headers: parsedHeaders };
+    const config = { url: url.trim(), headers: parsedHeaders, branch: branch.trim() };
 
     // ✅ Guardar configuración en el store
     try {
@@ -282,12 +283,20 @@ module.exports = ({ strapi }) => ({
     
     const url = config.url ? config.url.trim() : '';
     const headersList = Array.isArray(config.headers) ? config.headers : [];
+    const branch = config.branch;
 
     if (!url) {
       throw new ApplicationError('Webhook URL not configured', { 
         status: 400,
         details: { type: 'WEBHOOK_NOT_CONFIGURED' }
       });
+    }
+
+    if (!branch) {
+        throw new ApplicationError('Webhook BRANCH not configured', {
+            status: 400,
+            details: { type: 'WEBHOOK_NOT_CONFIGURED_BRANCH' }
+        });
     }
 
     const headersObj = headersList.reduce((acc, cur) => {
@@ -298,7 +307,7 @@ module.exports = ({ strapi }) => ({
     }, {});
 
     try {
-      const result = await sendWebhookRequest(url, headersObj);
+      const result = await sendWebhookRequest(url, headersObj, branch);
       return { ok: true, result };
     } catch (error) {
       if (error instanceof ApplicationError) throw error;

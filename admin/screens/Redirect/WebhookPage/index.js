@@ -26,6 +26,7 @@ const WebhookPage = () => {
   const toggleNotification = useNotification();
 
   const [url, setUrl] = useState('');
+  const [branch, setBranch] = useState('' );
   const [headers, setHeaders] = useState([{ key: '', value: '' }]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -35,6 +36,7 @@ const WebhookPage = () => {
         setUrl(data.url || '');
         const loadedHeaders = Array.isArray(data.headers) ? data.headers : [];
         setHeaders(loadedHeaders.length > 0 ? loadedHeaders : [{ key: '', value: '' }]);
+        setBranch(data.branch);
     }
   };
 
@@ -73,6 +75,7 @@ const WebhookPage = () => {
       const response = await post(`/${pluginId}/webhook`, {
           url: url.trim(),
           headers: compactHeaders,
+          branch: branch.trim(),
       });
       
       // Check if the request was successful (2xx status code, including 204 No Content)
@@ -166,6 +169,16 @@ const WebhookPage = () => {
               <Link onClick={addHeaderRow} startIcon={<Plus />}>
                 {formatMessage({ id: 'redirects.webhook.header.add', defaultMessage: 'Create new header' })}
               </Link>
+            </GridItem>
+            <GridItem col={12} s={12}>
+              <TextInput
+                name="webHookbody"
+                label={formatMessage({ id: 'redirects.webhook.branch', defaultMessage: 'Branch' })}
+                placeholder="place branch..."
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+                required
+              />
             </GridItem>
           </Grid>
         </Box>
