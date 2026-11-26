@@ -6,19 +6,19 @@ module.exports = [
     method: "POST",
     path: "/webhook",
     handler: "redirects.saveWebhook",
-    config: { policies: [], auth: false },
+    config: { policies: [] },
   },
   {
     method: "GET",
     path: "/webhook",
     handler: "redirects.getWebhookConfig",
-    config: { auth: false },
+    config: { policies: [] },
   },
   {
     method: "GET",
     path: "/webhook/execute",
     handler: "redirects.executeWebhook",
-    config: { policies: [], auth: false },
+    config: { policies: [] },
   },
   // Generic routes below
   {
