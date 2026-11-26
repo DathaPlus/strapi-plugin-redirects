@@ -1,3 +1,5 @@
+const { normalizarRedirect } = require('./normalizacion');
+
 /**
  * Queries and filters redirects based on the provided URL and optional ID.
  * @param {string} url The URL to query redirects for.
@@ -38,14 +40,71 @@ async function isUrlLooping(originalFromUrl, toUrl, id, checkedUrls = new Set())
 }
 
 /**
- * Validates a redirect, checking for duplicates and loops.
- * @param {Object} body The request body containing the redirect data.
+ * Completa from/to/type ausentes con el registro existente (solo en update).
+ * @param {Object} redirect
+ * @param {boolean} isUpdate
+ */
+async function completarConExistente(redirect, isUpdate) {
+  if (!isUpdate || redirect.id == null || !redirect.data) {
+    return;
+  }
+
+  const data = redirect.data;
+  const tipoEnPayload = Object.prototype.hasOwnProperty.call(data, 'type');
+
+  if (data.from !== undefined && data.to !== undefined && tipoEnPayload) {
+    return;
+  }
+
+  const existing = await strapi.entityService.findOne('plugin::redirects.redirect', redirect.id);
+  if (!existing) {
+    return;
+  }
+
+  if (data.from === undefined) {
+    data.from = existing.from;
+  }
+  if (data.to === undefined) {
+    data.to = existing.to;
+  }
+  if (!tipoEnPayload) {
+    data.type = existing.type;
+  }
+}
+
+/**
+ * Validates a redirect, checking format, duplicates and loops.
+ * Mutates redirect.data with normalized from/to/type when format is valid.
+ * @param {Object} redirect The request body containing the redirect data.
  * @param {boolean} [isUpdate=false] Whether this validation is for an update operation.
  * @returns {Promise<Object>} The validation result.
  */
 async function validateRedirect(redirect, isUpdate = false) {
-
   const id = redirect.id || undefined;
+
+  if (!redirect.data || typeof redirect.data !== 'object') {
+    redirect.data = {};
+  }
+
+  await completarConExistente(redirect, isUpdate);
+
+  try {
+    const normalizado = normalizarRedirect({
+      from: redirect.data.from,
+      to: redirect.data.to,
+      type: redirect.data.type,
+    });
+    redirect.data.from = normalizado.from;
+    redirect.data.to = normalizado.to;
+    redirect.data.type = normalizado.type;
+  } catch (error) {
+    return {
+      ok: false,
+      errorMessage: (error && error.message) || 'Los datos del redirect no son válidos.',
+      details: { type: 'FORMAT' },
+    };
+  }
+
   const { from, to } = redirect.data;
 
   let hasDuplicate = false;

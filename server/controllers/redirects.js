@@ -1,8 +1,12 @@
 'use strict';
 
 const { getPluginService } = require('../helpers/getPluginService');
+const {
+  adaptarCuerpoCreate,
+  adaptarCuerpoUpdate,
+} = require('../helpers/adaptarCuerpo');
 
-module.exports = () => ({
+const redirectsController = () => ({
   findOne: async (ctx) => {
     ctx.body = await getPluginService('redirects').findOne(ctx.params.id);
   },
@@ -10,9 +14,11 @@ module.exports = () => ({
     ctx.body = await getPluginService('redirects').findAll(ctx.query);
   },
   create: async (ctx) => {
+    ctx.request.body = adaptarCuerpoCreate(ctx.request.body);
     ctx.body = await getPluginService('redirects').create(ctx.request.body);
   },
   update: async (ctx) => {
+    ctx.request.body = adaptarCuerpoUpdate(ctx.request.body, ctx.params.id);
     ctx.body = await getPluginService('redirects').update(ctx.params.id, ctx.request.body);
   },
   delete: async (ctx) => {
@@ -72,3 +78,8 @@ module.exports = () => ({
     }
   },
 });
+
+redirectsController.adaptarCuerpoCreate = adaptarCuerpoCreate;
+redirectsController.adaptarCuerpoUpdate = adaptarCuerpoUpdate;
+
+module.exports = redirectsController;
