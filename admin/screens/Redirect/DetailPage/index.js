@@ -10,9 +10,11 @@ import getTrad from '../../../helpers/getTrad';
 
 import { RedirectForm } from '../../../components/RedirectForm';
 
+const KNOWN_SAVE_ERROR_TYPES = new Set(['DUPLICATE', 'LOOP']);
+
 const RedirectDetailPage = () => {
   const { get, post, put } = useFetchClient();
-  const { formatMessage } = useIntl();
+  const { formatMessage, messages } = useIntl();
   const { id: selectedRedirectId } = useParams();
   const [isLoading, setIsLoading] = useState(true);
   const history = useHistory();
@@ -21,6 +23,32 @@ const RedirectDetailPage = () => {
   const [resetCount, setResetCount] = useState(0);
 
   const isNewRedirect = window.location.href.endsWith('new');
+
+  const generalSaveErrorMessage = () =>
+    formatMessage({ id: getTrad('detail.form.save.notify.error.general.message') });
+
+  /**
+   * FORMAT → mensaje del servidor tal cual.
+   * Tipos con traducción → i18n.
+   * Tipo ausente o sin traducción → mensaje general (nunca …error.undefined.message).
+   */
+  const resolveSaveErrorMessage = (apiError) => {
+    const type = apiError?.details?.type;
+
+    if (type === 'FORMAT' && apiError?.message) {
+      return apiError.message;
+    }
+
+    if (type && KNOWN_SAVE_ERROR_TYPES.has(type)) {
+      const tradId = getTrad(`detail.form.save.notify.error.${type}.message`);
+      if (messages && messages[tradId]) {
+        return formatMessage({ id: tradId });
+      }
+      return formatMessage({ id: tradId, defaultMessage: generalSaveErrorMessage() });
+    }
+
+    return generalSaveErrorMessage();
+  };
 
   useEffect(() => {
     if (selectedRedirectId) {
@@ -66,22 +94,11 @@ const RedirectDetailPage = () => {
         }
       }
     } catch (error) {
-      if (error.response && error.response.data && error.response.data.error && error.response.data.error.details) {
-        const errorType = error.response.data.error.details.type;
-        toggleNotification({
-          type: 'warning',
-          message: formatMessage({
-            id: getTrad(`detail.form.save.notify.error.${errorType}.message`)
-          })
-        });
-      } else {
-        toggleNotification({
-          type: 'warning',
-          message: formatMessage({
-            id: getTrad('detail.form.save.notify.error.general.message')
-          })
-        });
-      }
+      const apiError = error?.response?.data?.error;
+      toggleNotification({
+        type: 'warning',
+        message: resolveSaveErrorMessage(apiError),
+      });
     }
   };
 
@@ -91,10 +108,9 @@ const RedirectDetailPage = () => {
     if (!result.data) {
       toggleNotification({
         type: 'warning',
-        message: formatMessage({
-          id: getTrad(`detail.form.save.notify.error.${result.error.details.type}.message`)
-        })
+        message: resolveSaveErrorMessage(result.error),
       });
+      return undefined;
     }
 
     toggleNotification({
