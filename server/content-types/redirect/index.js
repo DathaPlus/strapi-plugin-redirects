@@ -37,7 +37,7 @@ module.exports = {
         "gone_410",
         "unavailable_for_legal_reasons_451",
       ],
-      default: "found_302",
+      default: "moved_permanently_301",
       required: true,
     },
   },

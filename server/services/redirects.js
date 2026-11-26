@@ -1,6 +1,9 @@
-const { errors } = require('@strapi/utils');
-const { ApplicationError } = errors;
 const { validateRedirect } = require('../helpers/redirectValidationHelper');
+
+/** Lazy: permite `require('./strapi-server.js')` sin instalar peer de Strapi. */
+function getApplicationError() {
+  return require('@strapi/utils').errors.ApplicationError;
+}
 
 const sendWebhookRequest = async (url, headers, branch) => {
   const controller = new AbortController();
@@ -22,7 +25,7 @@ const sendWebhookRequest = async (url, headers, branch) => {
 
     if (status < 200 || status >= 300) {
       const errorText = await response.text();
-      throw new ApplicationError('Webhook returned non-2xx status', {
+      throw new (getApplicationError())('Webhook returned non-2xx status', {
         status,
         details: { type: 'WEBHOOK_NON_2XX', body: errorText },
       });
@@ -33,13 +36,13 @@ const sendWebhookRequest = async (url, headers, branch) => {
     clearTimeout(timeout);
 
     if (error.name === 'AbortError') {
-        throw new ApplicationError('Webhook request timeout', {
+        throw new (getApplicationError())('Webhook request timeout', {
           status: 408,
           details: { type: 'WEBHOOK_TIMEOUT' },
         });
     }
 
-    throw new ApplicationError(`Webhook request failed: ${error.message}`, {
+    throw new (getApplicationError())(`Webhook request failed: ${error.message}`, {
       status: 500,
       details: { type: 'WEBHOOK_REQUEST_FAILED', originalError: error.message },
     });
@@ -106,7 +109,7 @@ module.exports = ({ strapi }) => ({
     const validity = await validateRedirect(body);
 
     if (!validity.ok) {
-      throw new ApplicationError(validity.errorMessage, validity.details);
+      throw new (getApplicationError())(validity.errorMessage, validity.details);
     }
 
     const results = await strapi.entityService.create('plugin::redirects.redirect', body);
@@ -125,7 +128,7 @@ module.exports = ({ strapi }) => ({
     const validity = await validateRedirect({ ...body, id }, true);
 
     if (!validity.ok) {
-      throw new ApplicationError(validity.errorMessage, validity.details);
+      throw new (getApplicationError())(validity.errorMessage, validity.details);
     }
 
     const results = await strapi.entityService.update('plugin::redirects.redirect', id, body);
@@ -204,7 +207,7 @@ module.exports = ({ strapi }) => ({
 
     // ✅ Validar que se hayan enviado parámetros
     if (!url && !headers) {
-      throw new ApplicationError(
+      throw new (getApplicationError())(
         "No se obtuvieron parámetros para realizar las configuraciones",
         {
           status: 400,
@@ -215,7 +218,7 @@ module.exports = ({ strapi }) => ({
 
     // ✅ Validar que la URL no esté vacía ni sea inválida
     if (!url || typeof url !== "string" || !url.trim()) {
-      throw new ApplicationError("Webhook URL es requerida", {
+      throw new (getApplicationError())("Webhook URL es requerida", {
         status: 400,
         details: { type: "INVALID_WEBHOOK_URL" },
       });
@@ -230,7 +233,7 @@ module.exports = ({ strapi }) => ({
                   : JSON.parse(headers); // permite string JSON o array
       }
     } catch (e) {
-      throw new ApplicationError("Formato de headers inválido", {
+      throw new (getApplicationError())("Formato de headers inválido", {
         status: 400,
         details: { type: "INVALID_HEADERS_FORMAT" },
       });
@@ -245,7 +248,7 @@ module.exports = ({ strapi }) => ({
 
       return { ok: true, message: "Configuración del webhook guardada correctamente" };
     } catch (e) {
-      throw new ApplicationError("Error al guardar configuración del webhook", {
+      throw new (getApplicationError())("Error al guardar configuración del webhook", {
         status: 500,
         details: { type: "STORE_SAVE_ERROR", originalError: e.message },
       });
@@ -260,7 +263,7 @@ module.exports = ({ strapi }) => ({
       const config = await store.get({ key: "webhookConfig" });
 
       if (!config) {
-        throw new ApplicationError("No hay configuración guardada", {
+        throw new (getApplicationError())("No hay configuración guardada", {
           status: 404,
           details: { type: "CONFIG_NOT_FOUND" },
         });
@@ -268,7 +271,7 @@ module.exports = ({ strapi }) => ({
 
       return config;
     } catch (e) {
-      throw new ApplicationError("Error al obtener configuración del webhook", {
+      throw new (getApplicationError())("Error al obtener configuración del webhook", {
         status: 500,
         details: { type: "STORE_GET_ERROR", originalError: e.message },
       });
@@ -286,14 +289,14 @@ module.exports = ({ strapi }) => ({
     const branch = config.branch;
 
     if (!url) {
-      throw new ApplicationError('Webhook URL not configured', { 
+      throw new (getApplicationError())('Webhook URL not configured', { 
         status: 400,
         details: { type: 'WEBHOOK_NOT_CONFIGURED' }
       });
     }
 
     if (!branch) {
-        throw new ApplicationError('Webhook BRANCH not configured', {
+        throw new (getApplicationError())('Webhook BRANCH not configured', {
             status: 400,
             details: { type: 'WEBHOOK_NOT_CONFIGURED_BRANCH' }
         });
@@ -310,9 +313,9 @@ module.exports = ({ strapi }) => ({
       const result = await sendWebhookRequest(url, headersObj, branch);
       return { ok: true, result };
     } catch (error) {
-      if (error instanceof ApplicationError) throw error;
+      if (error instanceof getApplicationError()) throw error;
 
-      throw new ApplicationError(`Failed to execute webhook: ${error.message}`, {
+      throw new (getApplicationError())(`Failed to execute webhook: ${error.message}`, {
         status: 500,
         details: { type: 'WEBHOOK_EXECUTION_FAILED', originalError: error.message },
       });
