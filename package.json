@@ -1,6 +1,6 @@
 {
   "name": "@dathaplus/strapi-plugin-redirects",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "This plugin allows a user to manage redirects from the admin panel.",
   "strapi": {
     "name": "redirects",
@@ -42,5 +42,16 @@
     "node": ">=14.19.1 <=20.x.x",
     "npm": ">=6.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "admin",
+    "server",
+    "!server/**/*.test.js",
+    "strapi-admin.js",
+    "strapi-server.js",
+    "plugin-redirect-icon.png",
+    "sample-csv.csv",
+    "README.md",
+    "LICENSE"
+  ]
 }
