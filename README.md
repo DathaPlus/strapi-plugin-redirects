@@ -2,7 +2,7 @@
 
 This plugin provides a convenient way to manage URL redirects within a dedicated collection type in Strapi, catering to the headless nature of the CMS. While it does not automatically handle redirects on the server side, it offers a structured endpoint from which frontend applications can fetch redirect rules and implement redirection logic as needed. This approach empowers developers and content managers to seamlessly integrate and manage redirect rules, enhancing SEO and user experience by leveraging the flexibility of Strapi's headless architecture.
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue.svg?cacheSeconds=2592000)
+![Version](https://img.shields.io/badge/version-1.1.1-blue.svg?cacheSeconds=2592000)
 [![Documentation](https://img.shields.io/badge/documentation-yes-brightgreen.svg)](https://github.com/Webbist-dev/strapi-redirects/#readme)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/Webbist-dev/strapi-redirects/graphs/commit-activity)
 [![License: MIT](https://img.shields.io/github/license/Webbist-dev/strapi-redirects)](https://github.com/Webbist-dev/strapi-redirects/blob/master/LICENSE)
@@ -87,6 +87,11 @@ Define your redirect types with clear descriptions, for instance:
 - temporary_redirect_307: Temporarily moved to a new URL with the same method used.
 - gone_410: The resource is permanently removed and won't be available again.
 - unavailable_for_legal_reasons_451: Access to the resource is restricted due to legal reasons.
+
+## 1.1.1
+
+- Los tipos de redirect y el 301 por defecto salen de una sola fuente (`server/helpers/normalizacion.js`).
+- El paquete ya no incluye los tests.
 
 ## 1.1.0
 
