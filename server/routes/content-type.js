@@ -1,5 +1,8 @@
 "use strict";
 
+/** Escrituras del content-api solo con API token (ni JWT de users-permissions ni otra estrategia). */
+const soloApiToken = { policies: [], auth: { strategies: ["api-token"] } };
+
 module.exports = [
   {
     method: "GET",
@@ -11,13 +14,13 @@ module.exports = [
     method: "POST",
     path: "/",
     handler: "redirects.create",
-    config: { policies: [] },
+    config: soloApiToken,
   },
   {
     method: "PUT",
     path: "/:id",
     handler: "redirects.update",
-    config: { policies: [] },
+    config: soloApiToken,
   },
   {
     method: "GET",
