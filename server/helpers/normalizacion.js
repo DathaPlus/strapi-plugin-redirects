@@ -1,15 +1,6 @@
 "use strict";
 
-const TIPOS_REDIRECT = Object.freeze([
-  "moved_permanently_301",
-  "found_302",
-  "temporary_redirect_307",
-  "permanent_redirect_308",
-  "gone_410",
-  "unavailable_for_legal_reasons_451",
-]);
-
-const TIPO_DEFAULT = "moved_permanently_301";
+const { TIPOS_REDIRECT, TIPO_DEFAULT } = require("../../shared/tipos");
 
 /**
  * Normaliza y valida from/to/type de un redirect.
