@@ -2,14 +2,7 @@
 
 const csvtojson = require('csvtojson');
 
-const typeMappings = {
-  '301': 'moved_permanently_301',
-  '302': 'found_302',
-  '307': 'temporary_redirect_307',
-  '308': 'permanent_redirect_308',
-  '410': 'gone_410',
-  '451': 'unavailable_for_legal_reasons_451',
-};
+const { TIPO_POR_CODIGO, TIPO_DEFAULT } = require('../../shared/tipos');
 
 // Helper function to detect immediate loops
 const isImmediateLoop = (from, to) => from === to;
@@ -40,7 +33,7 @@ const parseAndValidateCSV = async (data) => {
     const redirects = dataRaw.map(item => ({
       from: item.from,
       to: item.to,
-      type: typeMappings[item.type] || 'moved_permanently_301',
+      type: TIPO_POR_CODIGO[item.type] || TIPO_DEFAULT,
     }));
 
     const validationResults = redirects.map((redirect, index, self) => {
@@ -62,9 +55,9 @@ const parseAndValidateCSV = async (data) => {
     });
     return validationResults;
   } catch (error) {
-    console.error('Failed to parse CSV:', error);
+    console.error('Failed to parse CSV:', error?.message);
     throw new Error('Error parsing and validating CSV data');
   }
 };
 
-module.exports = parseAndValidateCSV;
+module.exports = parseAndValidateCSV;

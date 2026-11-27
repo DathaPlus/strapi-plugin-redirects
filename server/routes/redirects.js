@@ -1,24 +1,31 @@
 "use strict";
 
+/** Leer, guardar o ejecutar el webhook exige el permiso propio (no basta la sesión de admin). */
+const soloConPermisoWebhook = {
+  policies: [
+    { name: "admin::hasPermissions", config: { actions: ["plugin::redirects.webhook"] } },
+  ],
+};
+
 module.exports = [
   // Place specific webhook routes FIRST to avoid being shadowed by generic routes
   {
     method: "POST",
     path: "/webhook",
     handler: "redirects.saveWebhook",
-    config: { policies: [] },
+    config: soloConPermisoWebhook,
   },
   {
     method: "GET",
     path: "/webhook",
     handler: "redirects.getWebhookConfig",
-    config: { policies: [] },
+    config: soloConPermisoWebhook,
   },
   {
-    method: "GET",
+    method: "POST",
     path: "/webhook/execute",
     handler: "redirects.executeWebhook",
-    config: { policies: [] },
+    config: soloConPermisoWebhook,
   },
   // Generic routes below
   {

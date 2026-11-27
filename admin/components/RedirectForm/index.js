@@ -6,7 +6,7 @@ import * as Yup from 'yup';
 import { ChevronUp, ChevronDown } from '@strapi/icons';
 import { Icon, Flex, Grid, GridItem, Box, Button, TextInput, SingleSelect, SingleSelectOption } from '@strapi/design-system';
 import { useNotification } from '@strapi/helper-plugin';
-import { redirectTypeOptions } from './types';
+import { TIPOS_REDIRECT as redirectTypeOptions, TIPO_DEFAULT } from '../../../shared/tipos';
 import getTrad from '../../helpers/getTrad';
 import S from '../../helpers/styles';
 
@@ -19,7 +19,7 @@ const RedirectForm = (props) => {
   const initialValues = useMemo(() => ({
     from: props.initialValues?.from || '',
     to: props.initialValues?.to || '',
-    type: props.initialValues?.type || redirectTypeOptions[0],
+    type: props.initialValues?.type || TIPO_DEFAULT,
   }), [props.initialValues]);
 
   const formik = useFormik({

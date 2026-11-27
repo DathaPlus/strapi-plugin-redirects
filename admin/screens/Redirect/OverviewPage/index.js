@@ -33,7 +33,7 @@ import pluginId from '../../../helpers/pluginId';
 import getTrad from '../../../helpers/getTrad';
 
 const RedirectOverviewPage = () => {
-  const { get, del } = useFetchClient();
+  const { get, post, del } = useFetchClient();
   const history = useHistory();
   const toggleNotification = useNotification();
   const { pageSize, page, setNewPage } = useSearchQuery();
@@ -165,7 +165,7 @@ const RedirectOverviewPage = () => {
 
   const handleRevalidate = async () => {
     try {
-      const response = await get(`/${pluginId}/webhook/execute`);
+      const response = await post(`/${pluginId}/webhook/execute`);
       // Check if the response indicates success
       if (response.data && response.data.ok) {
         toggleNotification({

@@ -7,6 +7,7 @@ import { Loader, Link, Box, BaseHeaderLayout, ContentLayout } from '@strapi/desi
 
 import pluginId from '../../../helpers/pluginId';
 import getTrad from '../../../helpers/getTrad';
+import describirError from '../../../helpers/describirError';
 
 import { RedirectForm } from '../../../components/RedirectForm';
 
@@ -63,7 +64,7 @@ const RedirectDetailPage = () => {
 
       setRedirect(data);
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load redirect:', describirError(error));
       setRedirect(undefined);
     } finally {
       setIsLoading(false);
