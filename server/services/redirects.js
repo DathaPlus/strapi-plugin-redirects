@@ -1,4 +1,5 @@
 const { validateRedirect } = require('../helpers/redirectValidationHelper');
+const { enmascararHeaders, fusionarHeaders } = require('../helpers/webhookHeaders');
 
 /** Lazy: permite `require('./strapi-server.js')` sin instalar peer de Strapi. */
 function getApplicationError() {
@@ -239,15 +240,25 @@ module.exports = ({ strapi }) => ({
       });
     }
 
-    const config = { url: url.trim(), headers: parsedHeaders, branch: branch.trim() };
-
-    // ✅ Guardar configuración en el store
+    // ✅ Guardar configuración en el store (los headers enmascarados conservan su valor guardado)
     try {
       const store = strapi.store({ type: "plugin", name: "redirects" });
+      const guardada = (await store.get({ key: "webhookConfig" })) || {};
+      let headersFinales;
+      try {
+        headersFinales = fusionarHeaders(parsedHeaders, guardada.headers);
+      } catch (e) {
+        throw new (getApplicationError())(e.message, {
+          status: 400,
+          details: { type: "MASKED_HEADER_WITHOUT_VALUE" },
+        });
+      }
+      const config = { url: url.trim(), headers: headersFinales, branch: branch.trim() };
       await store.set({ key: "webhookConfig", value: config });
 
       return { ok: true, message: "Configuración del webhook guardada correctamente" };
     } catch (e) {
+      if (e instanceof getApplicationError()) throw e;
       throw new (getApplicationError())("Error al guardar configuración del webhook", {
         status: 500,
         details: { type: "STORE_SAVE_ERROR", originalError: e.message },
@@ -269,8 +280,9 @@ module.exports = ({ strapi }) => ({
         });
       }
 
-      return config;
+      return { ...config, headers: enmascararHeaders(config.headers) };
     } catch (e) {
+      if (e instanceof getApplicationError()) throw e;
       throw new (getApplicationError())("Error al obtener configuración del webhook", {
         status: 500,
         details: { type: "STORE_GET_ERROR", originalError: e.message },

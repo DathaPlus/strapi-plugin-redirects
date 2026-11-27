@@ -9,6 +9,12 @@ module.exports = async ({ strapi }) => {
       uid: 'read',
       pluginName: 'redirects',
     },
+    {
+      section: 'plugins',
+      displayName: 'Manage the redirects webhook (URL, headers, run)',
+      uid: 'webhook',
+      pluginName: 'redirects',
+    },
   ];
   await strapi.admin.services.permission.actionProvider.registerMany(actions);
 };
