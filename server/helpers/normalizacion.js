@@ -3,6 +3,12 @@
 const { TIPOS_REDIRECT, TIPO_DEFAULT } = require("../../shared/tipos");
 
 /**
+ * Caracteres que Next (path-to-regexp) interpreta como patrón en `source`/`destination`:
+ * `/blog/:x` redirigiría cualquier ruta y `/oferta(1)` rompería el build de la landing.
+ */
+const CARACTERES_DE_PATRON = /[:()*+{}\\]/;
+
+/**
  * Normaliza y valida from/to/type de un redirect.
  * No altera la barra final de from ( /en y /en/ son distintos ).
  *
@@ -65,6 +71,11 @@ function normalizarFrom(valor) {
       "La ruta de origen (from) no puede incluir un dominio ni un esquema URL.",
     );
   }
+  if (CARACTERES_DE_PATRON.test(from)) {
+    throw new Error(
+      'La ruta de origen (from) no puede incluir : ( ) * + { } ni \\ (la web los toma como patrón).',
+    );
+  }
 
   return from;
 }
@@ -98,6 +109,11 @@ function normalizarTo(valor) {
   if (!esRuta && !esHttps) {
     throw new Error(
       'La ruta de destino (to) debe empezar con "/" o ser una URL https://.',
+    );
+  }
+  if (esRuta && CARACTERES_DE_PATRON.test(to)) {
+    throw new Error(
+      'La ruta de destino (to) no puede incluir : ( ) * + { } ni \\ (la web los toma como patrón).',
     );
   }
 

@@ -1,11 +1,14 @@
 "use strict";
 
-/** Leer, guardar o ejecutar el webhook exige el permiso propio (no basta la sesión de admin). */
-const soloConPermisoWebhook = {
+/**
+ * Leer, guardar o ejecutar el webhook exige el permiso propio (no basta la sesión de admin).
+ * Una config nueva por ruta: Strapi muta el objeto `config` al registrar cada ruta.
+ */
+const soloConPermisoWebhook = () => ({
   policies: [
     { name: "admin::hasPermissions", config: { actions: ["plugin::redirects.webhook"] } },
   ],
-};
+});
 
 module.exports = [
   // Place specific webhook routes FIRST to avoid being shadowed by generic routes
@@ -13,19 +16,19 @@ module.exports = [
     method: "POST",
     path: "/webhook",
     handler: "redirects.saveWebhook",
-    config: soloConPermisoWebhook,
+    config: soloConPermisoWebhook(),
   },
   {
     method: "GET",
     path: "/webhook",
     handler: "redirects.getWebhookConfig",
-    config: soloConPermisoWebhook,
+    config: soloConPermisoWebhook(),
   },
   {
     method: "POST",
     path: "/webhook/execute",
     handler: "redirects.executeWebhook",
-    config: soloConPermisoWebhook,
+    config: soloConPermisoWebhook(),
   },
   // Generic routes below
   {

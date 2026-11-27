@@ -29,6 +29,13 @@ describe("normalizarFrom", () => {
     assert.throws(() => normalizarFrom("//example.com/a"), /dominio/);
     assert.throws(() => normalizarFrom("https://example.com/a"), /empezar/);
   });
+
+  it("rechaza caracteres que la web toma como patrón (regresión 1.1.3)", () => {
+    for (const from of ["/blog/:slug", "/oferta(1)", "/a*", "/a+", "/a{b}", "/a\\b"]) {
+      assert.throws(() => normalizarFrom(from), /patrón/, from);
+    }
+    assert.equal(normalizarFrom("/es-ec/interpretacion-lengua-senas"), "/es-ec/interpretacion-lengua-senas");
+  });
 });
 
 describe("normalizarTo", () => {
@@ -45,6 +52,13 @@ describe("normalizarTo", () => {
     assert.throws(() => normalizarTo("http://tracendio.com"), /https/);
     assert.throws(() => normalizarTo("es-ec"), /empezar/);
     assert.throws(() => normalizarTo("//evil.com"), /empezar/);
+  });
+
+  it("rechaza patrones en rutas relativas pero acepta https con puerto (regresión 1.1.3)", () => {
+    for (const to of ["/blog/:slug", "/x(1)", "/x*"]) {
+      assert.throws(() => normalizarTo(to), /patrón/, to);
+    }
+    assert.equal(normalizarTo("https://tracendio.com:443/es-ec"), "https://tracendio.com:443/es-ec");
   });
 });
 

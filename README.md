@@ -2,7 +2,7 @@
 
 This plugin provides a convenient way to manage URL redirects within a dedicated collection type in Strapi, catering to the headless nature of the CMS. While it does not automatically handle redirects on the server side, it offers a structured endpoint from which frontend applications can fetch redirect rules and implement redirection logic as needed. This approach empowers developers and content managers to seamlessly integrate and manage redirect rules, enhancing SEO and user experience by leveraging the flexibility of Strapi's headless architecture.
 
-![Version](https://img.shields.io/badge/version-1.1.2-blue.svg?cacheSeconds=2592000)
+![Version](https://img.shields.io/badge/version-1.1.3-blue.svg?cacheSeconds=2592000)
 [![Documentation](https://img.shields.io/badge/documentation-yes-brightgreen.svg)](https://github.com/Webbist-dev/strapi-redirects/#readme)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/Webbist-dev/strapi-redirects/graphs/commit-activity)
 [![License: MIT](https://img.shields.io/github/license/Webbist-dev/strapi-redirects)](https://github.com/Webbist-dev/strapi-redirects/blob/master/LICENSE)
@@ -88,6 +88,13 @@ Define your redirect types with clear descriptions, for instance:
 - permanent_redirect_308: Permanently moved to a new URL with the same method used.
 - gone_410: The resource is permanently removed and won't be available again.
 - unavailable_for_legal_reasons_451: Access to the resource is restricted due to legal reasons.
+
+## 1.1.3
+
+- **Separate route configs (fix):** in 1.1.2 `POST` and `PUT /api/redirects` shared one `config` object, and Strapi wrote the `create` scope into it, so `PUT` required *create* instead of *update*. Each route now gets its own config; a token with only *update* can update.
+- **Pattern characters rejected:** `from` (and a relative `to`) can no longer contain `: ( ) * + { } \`. Next.js reads them as path patterns: `/blog/:slug` would redirect every path and `/offer(1)` would break the frontend build.
+- **Webhook destination:** the webhook URL must be `https://`. If the origin (scheme + host + port) changes, masked header values are not reused: type them again. The outgoing call no longer follows HTTP redirects (`redirect: "manual"`), so headers only reach the configured destination.
+- Admin webhook routes also get one config object per route.
 
 ## 1.1.2
 

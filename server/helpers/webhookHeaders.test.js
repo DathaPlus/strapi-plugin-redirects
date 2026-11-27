@@ -42,3 +42,38 @@ describe("fusionarHeaders", () => {
     );
   });
 });
+
+describe("cambio de destino del webhook (1.1.3)", () => {
+  const { validarUrlWebhook, mismoOrigen } = require("./webhookHeaders");
+  const guardados = [{ key: "Authorization", value: "Bearer ghp_secreto" }];
+
+  it("con otro origen, un valor enmascarado no reutiliza el secreto guardado", () => {
+    assert.throws(
+      () => fusionarHeaders([{ key: "Authorization", value: MASCARA }], guardados, { mismoDestino: false }),
+      /escribe de nuevo/,
+    );
+  });
+
+  it("con otro origen, un valor escrito de nuevo sí se guarda", () => {
+    assert.deepEqual(
+      fusionarHeaders([{ key: "Authorization", value: "Bearer nuevo" }], guardados, { mismoDestino: false }),
+      [{ key: "Authorization", value: "Bearer nuevo" }],
+    );
+  });
+
+  it("mismoOrigen compara esquema, host y puerto", () => {
+    const gh = "https://api.github.com/repos/x/y/dispatches";
+    assert.equal(mismoOrigen("https://api.github.com/repos/x/z/dispatches", gh), true);
+    assert.equal(mismoOrigen("https://evil.example/repos/x/y/dispatches", gh), false);
+    assert.equal(mismoOrigen("https://api.github.com:8443/x", gh), false);
+    assert.equal(mismoOrigen(gh, undefined), false);
+    assert.equal(mismoOrigen("no-es-url", gh), false);
+  });
+
+  it("validarUrlWebhook solo acepta https", () => {
+    assert.equal(validarUrlWebhook(" https://api.github.com/x ").hostname, "api.github.com");
+    assert.throws(() => validarUrlWebhook("http://api.github.com/x"), /https/);
+    assert.throws(() => validarUrlWebhook("file:///etc/passwd"), /https/);
+    assert.throws(() => validarUrlWebhook("no es url"), /no es válida/);
+  });
+});

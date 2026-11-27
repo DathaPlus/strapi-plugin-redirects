@@ -1,5 +1,5 @@
 const { validateRedirect } = require('../helpers/redirectValidationHelper');
-const { enmascararHeaders, fusionarHeaders } = require('../helpers/webhookHeaders');
+const { enmascararHeaders, fusionarHeaders, validarUrlWebhook, mismoOrigen } = require('../helpers/webhookHeaders');
 
 /** Lazy: permite `require('./strapi-server.js')` sin instalar peer de Strapi. */
 function getApplicationError() {
@@ -16,6 +16,8 @@ const sendWebhookRequest = async (url, headers, branch) => {
       headers,
       body: branch ? JSON.stringify({ ref: branch }) : undefined,
       signal: controller.signal,
+      // No seguir redirecciones: los headers (token) solo van al destino configurado; un 3xx es error.
+      redirect: 'manual',
     });
 
     clearTimeout(timeout);
@@ -224,6 +226,14 @@ module.exports = ({ strapi }) => ({
         details: { type: "INVALID_WEBHOOK_URL" },
       });
     }
+    try {
+      validarUrlWebhook(url);
+    } catch (e) {
+      throw new (getApplicationError())(e.message, {
+        status: 400,
+        details: { type: "INVALID_WEBHOOK_URL" },
+      });
+    }
 
     // ✅ Validar headers (si existen)
     let parsedHeaders = [];
@@ -246,7 +256,9 @@ module.exports = ({ strapi }) => ({
       const guardada = (await store.get({ key: "webhookConfig" })) || {};
       let headersFinales;
       try {
-        headersFinales = fusionarHeaders(parsedHeaders, guardada.headers);
+        headersFinales = fusionarHeaders(parsedHeaders, guardada.headers, {
+          mismoDestino: mismoOrigen(url.trim(), guardada.url),
+        });
       } catch (e) {
         throw new (getApplicationError())(e.message, {
           status: 400,
@@ -304,6 +316,15 @@ module.exports = ({ strapi }) => ({
       throw new (getApplicationError())('Webhook URL not configured', { 
         status: 400,
         details: { type: 'WEBHOOK_NOT_CONFIGURED' }
+      });
+    }
+
+    try {
+      validarUrlWebhook(url);
+    } catch (e) {
+      throw new (getApplicationError())(e.message, {
+        status: 400,
+        details: { type: 'INVALID_WEBHOOK_URL' }
       });
     }
 
